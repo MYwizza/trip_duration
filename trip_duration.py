@@ -31,6 +31,7 @@ from IPython.display import HTML
 from matplotlib.pyplot import *
 from matplotlib import cm
 from matplotlib import animation
+from matplotlib.animation import FuncAnimation
 import io
 import base64
 
@@ -221,13 +222,95 @@ train_data.loc[:,'pick_hour']=train_data['pickup_datetime'].dt.hour
 train_data.loc[:,'week_of_year']=train_data['pickup_datetime'].dt.weekofyear
 train_data.loc[:,'day_of_year']=train_data['pickup_datetime'].dt.dayofyear
 train_data.loc[:,'day_of_week']=train_data['pickup_datetime'].dt.dayofweek
-train_data.loc[:,'hvsine_pick_drop']=haversine(train_data['pickup_latitude'].values
-              ,train_data['pickup_longitude'].values,train_data['pickoff_latitude'].values,
-              train_data['pickoff_longitude'].values)
+train_data.loc[:,'hvsine_pick_drop']=haversine_(train_data['pickup_latitude'].values
+              ,train_data['pickup_longitude'].values,train_data['dropoff_latitude'].values,
+              train_data['dropoff_longitude'].values)
 train_data.loc[:,'manhtn_pick_drop']=manhattan_distance_pd(train_data['pickup_latitude'].values
-              ,train_data['pickup_longitude'].values,train_data['pickoff_latitude'].values,
-              train_data['pickoff_longitude'].values)
+              ,train_data['pickup_longitude'].values,train_data['dropoff_latitude'].values,
+              train_data['dropoff_longitude'].values)
 train_data.loc[:,'bearing']=bearing_array(train_data['pickup_latitude'].values
-              ,train_data['pickup_longitude'].values,train_data['pickoff_latitude'].values,
-              train_data['pickoff_longitude'].values)
+              ,train_data['pickup_longitude'].values,train_data['dropoff_latitude'].values,
+              train_data['dropoff_longitude'].values)
 
+def color(hour):
+    return hour*10
+
+def Animation(hour,temp):
+    train_data_new=temp.loc[temp['hour']==hour]
+    rgb1=np.zeros((3000,3500,3),dtype=np.uint8)
+    train_data_new['pick_lat_new']=list(map(int,(train_data_new['pickup_latitude']-40.6)*10000))
+    train_data_new['drop_lat_new']=list(map(int,(train_data_new['dropoff_latitude']-40.6)*10000))
+    train_data_new['pick_lon_new']=list(map(int,(train_data_new['pickup_longitude']-(-74.05))*10000))
+    train_data_new['drop_lon_new']=list(map(int,(train_data_new['dropoff_longitude']-(-74.05))*10000))
+    summary_plot=pd.DataFrame(train_data_new.groupby(['pick_lat_new','pick_lon_new'])['id'].count())
+    
+    summary_plot.reset_index(inplace=True)
+    summary_plot.head(120)
+    
+    for k in range(len(summary_plot['id'])):
+        i=summary_plot['pick_lat_new'][k]
+        j=summary_plot['pick_lon_new'][k]
+        a1=summary_plot['id'][k]
+        if(a1//50)>0:
+            rgb1[i][j][0]=255-color(hour)
+            rgb1[i,j,1]=255-color(hour)
+            rgb1[i,j,2]=0+color(hour)
+        elif(a1//10)>0:
+            rgb1[i,j,0]=0+color(hour)
+            rgb1[i,j,1]=255-color(hour)
+            rgb1[i,j,2]=0+color(hour)
+        else:
+            rgb1[i,j,0]=255-color(hour)
+            rgb1[i,j,1]=0+color(hour)
+            rgb1[i,j,2]=0+color(hour)
+    
+    return rgb1
+
+images_list=[]
+train_data_new['pickup_datetime']=pd.to_datetime(train_data_new['pickup_datetime'])
+train_data_new.loc[:,'hour']=train_data_new['pickup_datetime'].dt.hour
+
+for i in list(range(0,24)):
+    im=Animation(i,train_data_new)
+    images_list.append(im)
+
+#画出上车地点随小时的变化动图
+def build_gif(imgs=images_list,show_gif=False,save_gif=True,title=''):
+    fig,ax=plt.subplots(nrows=1,ncols=1,figsize=(10,10))
+    ax.set_axis_off()
+    hr_range=(list(range(0,24)))
+    
+    def show_im(pairs):
+        ax.clear()
+        ax.set_title('absolute traffic-hour'+str(int(pairs[0]))+':00')
+        ax.imshow(pairs[1])
+        ax.set_axis_off()
+    
+    pairs=list(zip(hr_range,imgs))
+    im_ani=animation.FuncAnimation(fig,show_im,pairs,interval=500,repeat_delay=0,blit=False)
+    plt.cla()
+    if save_gif:
+        im_ani.save('animation.html',writer='imagemagick')
+    if show_gif:
+        plt.show()
+    return
+
+build_gif()
+
+filename = 'animation.gif'
+video = io.open(filename, 'r+b').read()
+encoded = base64.b64encode(video)
+HTML(data='''<img src="data:image/gif;base64,{0}" type="gif" />'''.format(encoded.decode('ascii')))
+#findings：上午2点到6点出行较少，上午7点到下午4点出行为中等，下午5点到凌晨1点出行较多
+
+#一周的每一天与总行程时间的关系
+summary_wdays_avg_duration=pd.DataFrame(train_data.groupby(['vendor_id','day_of_week'])['trip_duration'].mean())
+summary_wdays_avg_duration.reset_index(inplace=True)
+summary_wdays_avg_duration['unit']=1
+sns.set(style='white',palette='muted',color_codes=True)
+sns.set_context('poster')
+sns.tsplot(data=summary_wdays_avg_duration,time='day_of_week',unit='unit',condition='vendor_id',
+           value='trip_duration')
+sns.despine(bottom=False)
+#findings
+#一周的每一天，vendor 1比vendor2的trip时间长，介于1~250之间
