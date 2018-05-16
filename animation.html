@@ -144,29 +144,29 @@ css/font-awesome.min.css">
 </script>
 
 <div class="animation" align="center">
-    <img id="_anim_imgd6239b904adf48f08fb5ced950cbbea3">
+    <img id="_anim_imgea09e10382be4a6c8e8d4b726ec567bb">
     <br>
-    <input id="_anim_sliderd6239b904adf48f08fb5ced950cbbea3" type="range" style="width:350px"
+    <input id="_anim_sliderea09e10382be4a6c8e8d4b726ec567bb" type="range" style="width:350px"
            name="points" min="0" max="1" step="1" value="0"
-           onchange="animd6239b904adf48f08fb5ced950cbbea3.set_frame(parseInt(this.value));"></input>
+           onchange="animea09e10382be4a6c8e8d4b726ec567bb.set_frame(parseInt(this.value));"></input>
     <br>
-    <button onclick="animd6239b904adf48f08fb5ced950cbbea3.slower()"><i class="fa fa-minus"></i></button>
-    <button onclick="animd6239b904adf48f08fb5ced950cbbea3.first_frame()"><i class="fa fa-fast-backward">
+    <button onclick="animea09e10382be4a6c8e8d4b726ec567bb.slower()"><i class="fa fa-minus"></i></button>
+    <button onclick="animea09e10382be4a6c8e8d4b726ec567bb.first_frame()"><i class="fa fa-fast-backward">
         </i></button>
-    <button onclick="animd6239b904adf48f08fb5ced950cbbea3.previous_frame()">
+    <button onclick="animea09e10382be4a6c8e8d4b726ec567bb.previous_frame()">
         <i class="fa fa-step-backward"></i></button>
-    <button onclick="animd6239b904adf48f08fb5ced950cbbea3.reverse_animation()">
+    <button onclick="animea09e10382be4a6c8e8d4b726ec567bb.reverse_animation()">
         <i class="fa fa-play fa-flip-horizontal"></i></button>
-    <button onclick="animd6239b904adf48f08fb5ced950cbbea3.pause_animation()"><i class="fa fa-pause">
+    <button onclick="animea09e10382be4a6c8e8d4b726ec567bb.pause_animation()"><i class="fa fa-pause">
         </i></button>
-    <button onclick="animd6239b904adf48f08fb5ced950cbbea3.play_animation()"><i class="fa fa-play"></i>
+    <button onclick="animea09e10382be4a6c8e8d4b726ec567bb.play_animation()"><i class="fa fa-play"></i>
         </button>
-    <button onclick="animd6239b904adf48f08fb5ced950cbbea3.next_frame()"><i class="fa fa-step-forward">
+    <button onclick="animea09e10382be4a6c8e8d4b726ec567bb.next_frame()"><i class="fa fa-step-forward">
         </i></button>
-    <button onclick="animd6239b904adf48f08fb5ced950cbbea3.last_frame()"><i class="fa fa-fast-forward">
+    <button onclick="animea09e10382be4a6c8e8d4b726ec567bb.last_frame()"><i class="fa fa-fast-forward">
         </i></button>
-    <button onclick="animd6239b904adf48f08fb5ced950cbbea3.faster()"><i class="fa fa-plus"></i></button>
-  <form action="#n" name="_anim_loop_selectd6239b904adf48f08fb5ced950cbbea3" class="anim_control">
+    <button onclick="animea09e10382be4a6c8e8d4b726ec567bb.faster()"><i class="fa fa-plus"></i></button>
+  <form action="#n" name="_anim_loop_selectea09e10382be4a6c8e8d4b726ec567bb" class="anim_control">
     <input type="radio" name="state"
            value="once" > Once </input>
     <input type="radio" name="state"
@@ -181,9 +181,9 @@ css/font-awesome.min.css">
   /* Instantiate the Animation class. */
   /* The IDs given should match those used in the template above. */
   (function() {
-    var img_id = "_anim_imgd6239b904adf48f08fb5ced950cbbea3";
-    var slider_id = "_anim_sliderd6239b904adf48f08fb5ced950cbbea3";
-    var loop_select_id = "_anim_loop_selectd6239b904adf48f08fb5ced950cbbea3";
+    var img_id = "_anim_imgea09e10382be4a6c8e8d4b726ec567bb";
+    var slider_id = "_anim_sliderea09e10382be4a6c8e8d4b726ec567bb";
+    var loop_select_id = "_anim_loop_selectea09e10382be4a6c8e8d4b726ec567bb";
     var frames = new Array(24);
     
   for (var i=0; i<24; i++){
@@ -195,7 +195,7 @@ css/font-awesome.min.css">
     /* set a timeout to make sure all the above elements are created before
        the object is initialized. */
     setTimeout(function() {
-        animd6239b904adf48f08fb5ced950cbbea3 = new Animation(frames, img_id, slider_id, 500.0,
+        animea09e10382be4a6c8e8d4b726ec567bb = new Animation(frames, img_id, slider_id, 500.0,
                                  loop_select_id);
     }, 0);
   })()

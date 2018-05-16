@@ -297,7 +297,7 @@ def build_gif(imgs=images_list,show_gif=False,save_gif=True,title=''):
 
 build_gif()
 
-filename = 'animation.gif'
+filename = 'animation.html'
 video = io.open(filename, 'r+b').read()
 encoded = base64.b64encode(video)
 HTML(data='''<img src="data:image/gif;base64,{0}" type="gif" />'''.format(encoded.decode('ascii')))
@@ -314,3 +314,172 @@ sns.tsplot(data=summary_wdays_avg_duration,time='day_of_week',unit='unit',condit
 sns.despine(bottom=False)
 #findings
 #一周的每一天，vendor 1比vendor2的trip时间长，介于1~250之间
+
+#利用琴型图（violinplot）分析乘客数与trip时间的关系
+sns.set(style='white',palette='pastel',color_codes=True)
+sns.set_context('poster')
+train_data2=train_data.copy()
+train_data2['trip_duration']=np.log(train_data['trip_duration'])
+sns.violinplot(x='passenger_count',y='trip_duration',hue='vendor_id',data=train_data2,inner='quart',split=True,
+               palette={1:'g',2:'r'})
+sns.despine(left=True)
+#findings
+#当乘客数是0时，vendor1和2都会有trip时间为负值，应去除
+#乘客数为0的解释是，乘客提前叫了一辆出租车，在等待
+#vendor1在人数是2和3的，有长的trip时间
+#人数为7，8，9的trip duration非常少
+
+#箱型图猜测一周每一天与形成时间的关系
+sns.set(style='ticks')
+sns.boxplot(x='day_of_week',y='trip_duration',hue='vendor_id',data=train_data,palette='PRGn')
+plt.ylim(0,6000)
+sns.despine(trim=True,offset=10)
+#findings
+#周1，2，3，4比其他天的trip duration 长
+
+#line-plots分析一周每一天按小时的trip duration变化
+summary_hour_duration=pd.DataFrame(train_data.groupby(['day_of_week','pick_hour'])['trip_duration'].mean())
+summary_hour_duration.reset_index(inplace=True)
+summary_hour_duration['unit']=1
+sns.set(style='white',palette='muted',color_codes=False)
+sns.tsplot(time='pick_hour',unit='unit',condition='day_of_week',value='trip_duration',data=summary_hour_duration)
+sns.despine(bottom=False)
+#findings
+#在am5：00~15：00时，周六和周日的trip duration明显比工作日少
+#周六的深夜 trip dutation比其他的时间多
+
+#集群分析（cluster）
+
+def assign_cluster(df,k):
+    df_pick=df[['pickup_longitude','pickup_latitude']]
+    df_drop=df[['dropoff_longitude','dropoff_latitude']]
+    init=np.array([[ -73.98737616,   40.72981533],
+       [-121.93328857,   37.38933945],
+       [ -73.78423222,   40.64711269],
+       [ -73.9546417 ,   40.77377538],
+       [ -66.84140269,   36.64537175],
+       [ -73.87040541,   40.77016484],
+       [ -73.97316185,   40.75814346],
+       [ -73.98861094,   40.7527791 ],
+       [ -72.80966949,   51.88108444],
+       [ -76.99779701,   38.47370625],
+       [ -73.96975298,   40.69089596],
+       [ -74.00816622,   40.71414939],
+       [ -66.97216034,   44.37194443],
+       [ -61.33552933,   37.85105133],
+       [ -73.98001393,   40.7783577 ],
+       [ -72.00626526,   43.20296402],
+       [ -73.07618713,   35.03469086],
+       [ -73.95759366,   40.80316361],
+       [ -79.20167796,   41.04752096],
+       [ -74.00106031,   40.73867723]])
+    k_means_pick=KMeans(n_clusters=k,init=init,n_init=1)
+    k_means_pick.fit(df_pick)
+    clust_pick=k_means_pick.labels_
+    df['label_pick']=clust_pick.tolist()
+    df['label_drop']=k_means_pick.predict(df_drop)
+    return df,k_means_pick
+
+train_cl,k_means=assign_cluster(train_data,20)
+centroid_pickups=pd.DataFrame(k_means.cluster_centers_,columns=['centroid_pick_long','centroid_pick_lat'])
+centroid_dropoff=pd.DataFrame(k_means.cluster_centers_,columns=['centroid_drop_long','centroid_drop_lat'])
+centroid_pickups['label_pick']=centroid_pickups.index
+centroid_dropoff['label_drop']=centroid_dropoff.index
+train_cl=pd.merge(train_cl,centroid_pickups,how='left',on='label_pick')
+train_cl=pd.merge(train_cl,centroid_dropoff,how='left',on='label_drop')
+
+#根据集群，计算上下车的距离和方位
+train_cl.loc[:,'hvsine_pick_cent_p']=haversine_(train_cl['pickup_latitude'].values,train_cl['pickup_longitude'].values,
+            train_cl['centroid_pick_lat'].values,train_cl['centroid_pick_long'].values)#计算上车地点只集群点的距离
+train_cl.loc[:,'hvsine_drop_cent_d']=haversine_(train_cl['dropoff_latitude'].values,train_cl['dropoff_longitude'].values,
+            train_cl['centroid_drop_lat'].values,train_cl['centroid_drop_long'].values)#计算下车地点至集群点的距离
+train_cl.loc[:,'hvsine_cent_p_cent_d']=haversine_(train_cl['centroid_pick_lat'].values,train_cl['centroid_pick_long'].values,
+            train_cl['centroid_drop_lat'].values,train_cl['centroid_drop_long'].values)#计算上车集群点和下车集群点之间的距离
+
+train_cl.loc[:,'manhtn_pick_cent_p']=manhattan_distance_pd(train_cl['pickup_latitude'].values,train_cl['pickup_longitude'].values,
+            train_cl['centroid_pick_lat'].values,train_cl['centroid_pick_long'].values)#计算上车地点只集群点的距离
+train_cl.loc[:,'manhtn_drop_cent_d']=manhattan_distance_pd(train_cl['dropoff_latitude'].values,train_cl['dropoff_longitude'].values,
+            train_cl['centroid_drop_lat'].values,train_cl['centroid_drop_long'].values)#计算下车地点至集群点的距离
+train_cl.loc[:,'manhtn_cent_p_cent_d']=manhattan_distance_pd(train_cl['centroid_pick_lat'].values,train_cl['centroid_pick_long'].values,
+            train_cl['centroid_drop_lat'].values,train_cl['centroid_drop_long'].values)#计算上车集群点和下车集群点之间的距离
+
+train_cl.loc[:,'bearing_pick_cent_p']=bearing_array(train_cl['pickup_latitude'].values,train_cl['pickup_longitude'].values,
+            train_cl['centroid_pick_lat'].values,train_cl['centroid_pick_long'].values)#计算上车地点只集群点的方位
+train_cl.loc[:,'bearing_drop_cent_d']=bearing_array(train_cl['dropoff_latitude'].values,train_cl['dropoff_longitude'].values,
+            train_cl['centroid_drop_lat'].values,train_cl['centroid_drop_long'].values)#计算下车地点至集群点的方位
+train_cl.loc[:,'bearing_cent_p_cent_d']=bearing_array(train_cl['centroid_pick_lat'].values,train_cl['centroid_pick_long'].values,
+            train_cl['centroid_drop_lat'].values,train_cl['centroid_drop_long'].values)#计算上车集群点和下车集群点之间的方位
+
+train_cl['speed_hvsn']=train_cl.hvsine_pick_drop/train_cl.total_travel_time
+train_cl['speed_manhtn']=train_cl.manhtn_pick_drop/train_cl.total_travel_time
+train_cl.head()
+
+def cluster_summary(sum_df):
+    #该函数求每一个集群点的trip平均时间和最多的起始点行程次数
+    summary_avg_time=pd.DataFrame(sum_df.groupby('label_pick')['trip_duration'].mean())
+    summary_avg_time.reset_index(inplace=True)
+    summary_pref_clus=pd.DataFrame(sum_df.groupby(['label_pick','label_drop'])['id'].count())
+    summary_pref_clus.reset_index(inplace=True)
+    summary_pref_clus=summary_pref_clus.loc[summary_pref_clus.groupby('label_pick')['id'].idxmax()]
+    summary=pd.merge(summary_avg_time,summary_pref_clus,how='left',on='label_pick')
+    summary=summary.rename(columns={'trip_duration':'avg_triptime'})
+    return summary
+
+import folium
+def show_fmaps(train_data,path=1):
+    full_data=train_data
+    summary_full_data=pd.DataFrame(full_data.groupby('label_pick')['id'].count())
+    summary_full_data.reset_index(inplace=True)
+    summary_full_data=summary_full_data.loc[summary_full_data['id']>70000]
+    map_1=folium.Map(location=[40.7679,-73.9821],zoom_start=10,tiles='Stamen Toner')
+    new_df=train_data.loc[train_data['label_pick'].isin(summary_full_data.label_pick.tolist())].sample(50)
+    new_df.reset_index(inplace=True,drop=True)
+    for i in range(new_df.shape[0]):
+#        pick_long=new_df.loc[i,'pickup_longitude']
+#        pick_lat=new_df.loc[i,'pickup_latitude']
+#        dest_long=new_df.loc[i,'dropoff_longitude']
+#        dest_lat=new_df.loc[i,'dropoff_latitude']
+        pick_long = new_df.loc[new_df.index ==i]['pickup_longitude'].values[0]
+        pick_lat = new_df.loc[new_df.index ==i]['pickup_latitude'].values[0]
+        dest_long = new_df.loc[new_df.index ==i]['dropoff_longitude'].values[0]
+        dest_lat = new_df.loc[new_df.index ==i]['dropoff_latitude'].values[0]
+        folium.Marker([pick_lat,pick_long]).add_to(map_1)
+        folium.Marker([dest_lat,dest_long]).add_to(map_1)
+    return map_1
+
+osm=show_fmaps(train_data,path=1)
+osm.save('map.html')
+    
+def clusters_map(clus_data,full_data,tile='OpenStreetMap',sig=0,zoom=12,circle=0,radius_=30):
+    map_1=folium.Map(location=[40.7679,-73.9821],zoom_start=zoom,tiles=tile)
+    summary_full_data=pd.DataFrame(full_data.groupby('label_pick')['id'].count())
+    summary_full_data.reset_index(inplace=True)
+    if sig==1:
+        summary_full_data=summary_full_data.loc[summary_full_data['id']>70000]
+    sig_cluster=summary_full_data['label_pick'].tolist()
+    clus_summary=cluster_summary(full_data)
+    for i in sig_cluster:
+        pick_long=clus_data.loc[clus_data.index==i]['centroid_pick_long'].values[0]
+        pick_lat=clus_data.loc[clus_data.index==i]['centroid_pick_lat'].values[0]
+        clus_no=clus_data.loc[clus_data.index==i]['label_pick'].values[0]
+        most_visited_clus=clus_summary.loc[clus_summary['label_pick']==i]['label_drop'].values[0]
+        avg_triptime=clus_summary.loc[clus_summary['label_pick']==i]['avg_triptime'].values[0]
+        pop='cluster='+str(clus_no)+'&most visited cluster='+str(most_visited_clus)+'&avg triptime from this cluster='+str(avg_triptime)
+        if circle==1:
+            folium.CircleMarker(location=[pick_lat,pick_long],radius=radius_,
+                                color='#F08080',
+                                fill_color='#3186cc',popup=pop).add_to(map_1)
+        folium.Marker([pick_lat,pick_long],popup=pop).add_to(map_1)
+    return map_1
+
+clus_map=clusters_map(centroid_pickups,train_cl,sig=0,zoom=3.2,circle=1,tile='Stamen Terrain')
+clus_map.save('clus_map.html')
+
+clus_map_sig=clusters_map(centroid_pickups,train_cl,sig=1,circle=1)
+clus_map_sig.save('clus_map_sig.html')        
+
+from pandas.tools.plotting import parallel_coordinates
+parallel_coordinates(train_data.sample(1200)[['vendor_id','day_of_week','passenger_count',
+                     'pick_month','label_pick','pick_hour']],'vendor_id',colormap='rainbow')
+plt.show()
+        
