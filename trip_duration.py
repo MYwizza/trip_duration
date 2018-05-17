@@ -483,3 +483,51 @@ parallel_coordinates(train_data.sample(1200)[['vendor_id','day_of_week','passeng
                      'pick_month','label_pick','pick_hour']],'vendor_id',colormap='rainbow')
 plt.show()
         
+#从测试数据中提取特征
+fastest_routes_test=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\fastest_routes_test.csv')
+test=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\test.csv')
+test_sc=fastest_routes_test[['id','total_distance','total_travel_time','number_of_steps']]
+test_new=pd.merge(test,test_sc,on='id',how='left')
+
+test_new['pickup_datetime']=pd.to_datetime(test_new['pickup_datetime'])
+test_new['pick_hour']=test_new['pickup_datetime'].dt.hour
+test_new['pick_month']=test_new['pickup_datetime'].dt.month
+test_new['day_of_week']=test_new['pickup_datetime'].dt.dayofweek
+test_new['day_of_year']=test_new['pickup_datetime'].dt.dayofyear
+test_new['week_of_year']=test_new['pickup_datetime'].dt.weekofyear
+
+test_new['hvsine_pick_drop']=haversine_(test_new['pickup_latitude'].values,test_new['pickup_longitude'].values,
+        test_new['dropoff_latitude'].values,test_new['dropoff_longitude'].values)
+test_new['manhtn_pick_drop']=manhattan_distance_pd(test_new['pickup_latitude'].values,test_new['pickup_longitude'].values,
+        test_new['dropoff_latitude'].values,test_new['dropoff_longitude'].values)
+test_new['bearing']=bearing_array(test_new['pickup_latitude'].values,test_new['pickup_longitude'].values,
+        test_new['dropoff_latitude'].values,test_new['dropoff_longitude'].values)
+
+test_new['label_pick']=k_means.predict(test_new[['pickup_latitude','pickup_longitude']])
+test_new['label_drop']=k_means.predict(test_new[['dropoff_latitude','dropoff_longitude']])
+test_cl=pd.merge(test_new,centroid_pickups,how='left',on='label_pick')
+test_cl=pd.merge(test_cl,centroid_dropoff,how='left',on='label_drop')
+
+test_cl['hvsine_pick_cent_p']=haversine_(test_cl['pickup_latitude'].values,test_cl['pickup_longitude'].values,
+       test_cl['centroid_pick_lat'].values,test_cl['centroid_pick_long'].values)
+test_cl['hvsine_drop_cent_d']=haversine_(test_cl['dropoff_latitude'].values,test_cl['dropoff_longitude'].values,
+       test_cl['centroid_drop_lat'].values,test_cl['centroid_drop_long'].values)
+test_cl['hvsine_cent_p_cent_d']=haversine_(test_cl['centroid_pick_lat'].values,test_cl['centroid_pick_long'].values,
+       test_cl['centroid_drop_lat'].values,test_cl['centroid_drop_long'].values)
+
+test_cl['manhtn_pick_cent_p']=manhattan_distance_pd(test_cl['pickup_latitude'].values,test_cl['pickup_longitude'].values,
+       test_cl['centroid_pick_lat'].values,test_cl['centroid_pick_long'].values)
+test_cl['manhtn_drop_cent_d']=manhattan_distance_pd(test_cl['dropoff_latitude'].values,test_cl['dropoff_longitude'].values,
+       test_cl['centroid_drop_lat'].values,test_cl['centroid_drop_long'].values)
+test_cl['manhtn_cent_p_cent_d']=manhattan_distance_pd(test_cl['centroid_pick_lat'].values,test_cl['centroid_pick_long'].values,
+       test_cl['centroid_drop_lat'].values,test_cl['centroid_drop_long'].values)
+
+test_cl['bearing_pick_cent_p']=bearing_array(test_cl['pickup_latitude'].values,test_cl['pickup_longitude'].values,
+       test_cl['centroid_pick_lat'].values,test_cl['centroid_pick_long'].values)
+test_cl['bearing_drop_cent_d']=bearing_array(test_cl['dropoff_latitude'].values,test_cl['dropoff_longitude'].values,
+       test_cl['centroid_drop_lat'].values,test_cl['centroid_drop_long'].values)
+test_cl['bearing_cent_p_cent_d']=bearing_array(test_cl['centroid_pick_lat'].values,test_cl['centroid_pick_long'].values,
+       test_cl['centroid_drop_lat'].values,test_cl['centroid_drop_long'].values)
+
+test_cl['speed_hvsn']=test_cl['hvsine_pick_drop']/test_cl['total_travel_time']
+test_cl['manhtn']=test_cl['manhtn_pick_drop']/test_cl['total_travel_time']
