@@ -530,4 +530,64 @@ test_cl['bearing_cent_p_cent_d']=bearing_array(test_cl['centroid_pick_lat'].valu
        test_cl['centroid_drop_lat'].values,test_cl['centroid_drop_long'].values)
 
 test_cl['speed_hvsn']=test_cl['hvsine_pick_drop']/test_cl['total_travel_time']
-test_cl['manhtn']=test_cl['manhtn_pick_drop']/test_cl['total_travel_time']
+test_cl['speed_manhtn']=test_cl['manhtn_pick_drop']/test_cl['total_travel_time']
+
+#建立XGB模型
+import xgboost as xgb
+from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from sklearn.cluster import MiniBatchKMeans
+import warnings
+
+train=train_cl
+test=test_cl
+coords=np.vstack((train[['pickup_latitude','pickup_longitude']].values,
+                 train[['dropoff_latitude','dropoff_longitude']].values,
+                 test[['pickup_latitude','pickup_longitude']].values,
+                 test[['dropoff_latitude','dropoff_longitude']].values))
+
+pca=PCA().fit(coords)#主成份分析
+train['pickup_pca0']=pca.transform(train[['pickup_latitude','pickup_longitude']])[:,0]#特征1的成分
+train['pickup_pca1']=pca.transform(train[['pickup_latitude','pickup_longitude']])[:,1]#特征2的成分
+train['dropoff_pca0']=pca.transform(train[['dropoff_latitude','dropoff_longitude']])[:,0]
+train['dropoff_pca1']=pca.transform(train[['dropoff_latitude','dropoff_longitude']])[:,1]
+test['pickup_pca0']=pca.transform(test[['pickup_latitude','pickup_longitude']])[:,0]#特征1的成分
+test['pickup_pca1']=pca.transform(test[['pickup_latitude','pickup_longitude']])[:,1]#特征2的成分
+test['dropoff_pca0']=pca.transform(test[['dropoff_latitude','dropoff_longitude']])[:,0]
+test['dropoff_pca1']=pca.transform(test[['dropoff_latitude','dropoff_longitude']])[:,1]
+
+train['store_and_fwd_flag_int']=np.where(train['store_and_fwd_flag']=='N',0,1)
+test['store_and_fwd_flag_int']=np.where(test['store_and_fwd_flag']=='N',0,1)
+
+feature_names=list(train.columns)
+print('different features in train and test are {}'.format(np.setdiff1d(train.columns,test.columns)))
+
+do_not_use_for_training=['pickup_datetime','id','dropoff_datetime','store_and_fwd_flag','trip_duration']
+feature_names=[f for f in train.columns if f not in do_not_use_for_training]
+print('we will be using following features for training {}'.format(feature_names))
+print('')
+print('total number of features are {}'.format(len(feature_names)))
+
+y=np.log(train['trip_duration'].values+1)
+
+#对train进行训练数据和测试数据分割
+xtr,xv,ytr,yv=train_test_split(train[feature_names].values,y,test_size=0.2,random_state=1987)
+dtrain=xgb.DMatrix(xtr,label=ytr)
+dvalid=xgb.DMatrix(xv,label=yv)
+dtest=xgb.DMatrix(test[feature_names].values)
+watch=[(dtrain,'train'),(dvalid,'valide')]
+xgb_pars={'min_child_weight':50,'eta':0.3,'colsample_bytree':0.3,'max_depth':10,'subsample':0.8,
+          'lambda':1.,'nthread':-1,'booster':'gbtree','silent':1,'eval_metric':'rmse','objective':'reg:linear'}
+model=xgb.train(xgb_pars,dtrain,15,watch,early_stopping_rounds=2,maximize=False,verbose_eval=1)
+print('modeling RMSLE %.5f'% model.best_score)
+
+#考虑天气对trip_duration的影响
+weather=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\weather_data_nyc_centralpark_2016.csv')
+from ggplot import *
+weather['date']=pd.to_datetime(weather.date)
+weather['day_of_year']=weather['date'].dt.dayofyear
+p=ggplot(aes(x='date'),data=weather)+geom_line(aes(y='minimum temperature',colour='blue'))+geom_line(aes(y='maximum temperature',colour='red'))
+p+geom_point(aes(y='minimum temperature',colour='blue'))
+#findings
+#二月份的最小温度达到了零下，发现trip_duration比其他时间多
+p1=ggplot(aes(x='pickup_date'),data=train_plot_grouped)+geom_line(aes(y='trip_duration_log',colour='blue'))
