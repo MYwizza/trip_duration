@@ -39,11 +39,11 @@ address='https://www.kaggle.com/maheshdadhich/strength-of-visualization-python-v
 
 #导入和合并数据
 s=time.time()
-train_fr_1=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\fastest_routes_train_part_1.csv')
-train_fr_2=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\fastest_routes_train_part_2.csv')
+train_fr_1=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\fastest_routes_train_part_1.csv')
+train_fr_2=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\fastest_routes_train_part_2.csv')
 train_fr=pd.concat([train_fr_1,train_fr_2])
 train_fr_new=train_fr[['id','total_distance','total_travel_time','number_of_steps']]
-train_df=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\train.csv')
+train_df=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\train.csv')
 train=pd.merge(train_df,train_fr_new,on='id',how='left')
 train_df=train.copy()
 end=time.time()
@@ -484,8 +484,13 @@ parallel_coordinates(train_data.sample(1200)[['vendor_id','day_of_week','passeng
 plt.show()
         
 #从测试数据中提取特征
+<<<<<<< HEAD
+fastest_routes_test=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\fastest_routes_test.csv')
+test=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\test.csv')
+=======
 fastest_routes_test=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\fastest_routes_test.csv')
 test=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\test.csv')
+>>>>>>> a3e2fda7271c556fda20d8afed03f44084380774
 test_sc=fastest_routes_test[['id','total_distance','total_travel_time','number_of_steps']]
 test_new=pd.merge(test,test_sc,on='id',how='left')
 
@@ -582,7 +587,11 @@ model=xgb.train(xgb_pars,dtrain,15,watch,early_stopping_rounds=2,maximize=False,
 print('modeling RMSLE %.5f'% model.best_score)
 
 #考虑天气对trip_duration的影响
+<<<<<<< HEAD
+weather=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\weather_data_nyc_centralpark_2016.csv')
+=======
 weather=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\weather_data_nyc_centralpark_2016.csv')
+>>>>>>> a3e2fda7271c556fda20d8afed03f44084380774
 from ggplot import *
 weather['date']=pd.to_datetime(weather.date)
 weather['day_of_year']=weather['date'].dt.dayofyear
@@ -590,4 +599,47 @@ p=ggplot(aes(x='date'),data=weather)+geom_line(aes(y='minimum temperature',colou
 p+geom_point(aes(y='minimum temperature',colour='blue'))
 #findings
 #二月份的最小温度达到了零下，发现trip_duration比其他时间多
+<<<<<<< HEAD
+
+train_plot=train[['pickup_datetime','trip_duration']]
+train_plot['pickup_date']=train_plot['pickup_datetime'].dt.date
+train_plot.drop('pickup_datetime',axis=1,inplace=True)
+train_plot['trip_duration']=np.log(train_plot['trip_duration'])
+train_plot_grouped=train_plot.groupby('pickup_date')['trip_duration'].mean()
+train_plot_grouped=pd.DataFrame(train_plot_grouped)
+train_plot_grouped.reset_index(inplace=True)
+train_plot_grouped.rename(columns={'trip_duration':'trip_duration_log'},inplace=True)
+train_plot_grouped['pickup_date']=pd.to_datetime(train_plot_grouped.pickup_date)
 p1=ggplot(aes(x='pickup_date'),data=train_plot_grouped)+geom_line(aes(y='trip_duration_log',colour='blue'))
+p1+geom_point(aes(y='trip_duration_log',colour='blue'))
+
+weather['precipitation'].unique()
+weather['precipitation']=np.where(weather['precipitation']=='T',0,weather['precipitation'])
+weather['precipitation']=list(map(float,weather['precipitation']))
+weather['snow fall']=np.where(weather['snow fall']=='T',0,weather['snow fall'])
+weather['snow fall']=list(map(float,weather['snow fall']))
+weather['snow depth']=np.where(weather['snow depth']=='T',0,weather['snow depth'])
+weather['snow depth']=list(map(float,weather['snow depth']))
+
+import plotly.graph_objs as go
+import plotly
+import plotly.plotly as py
+
+random_x=weather['date'].values
+random_y0=weather['precipitation']
+random_y1=weather['snow fall']
+random_y2=weather['snow depth']
+
+trace0=go.Scatter(x=random_x,y=random_y0,mode='markers',name='precipitation')
+trace1=go.Scatter(x=random_x,y=random_y1,mode='markers',name='snow fall')
+trace2=go.Scatter(x=random_x,y=random_y2,mode='markers',name='snow depth')
+data=[trace0,trace1,trace2]
+
+plotly.offline.iplot(data, filename='scatter-mode')
+
+from collections import Counter
+Counter('abracadabra').most_common()
+
+=======
+p1=ggplot(aes(x='pickup_date'),data=train_plot_grouped)+geom_line(aes(y='trip_duration_log',colour='blue'))
+>>>>>>> a3e2fda7271c556fda20d8afed03f44084380774
