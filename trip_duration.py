@@ -484,13 +484,10 @@ parallel_coordinates(train_data.sample(1200)[['vendor_id','day_of_week','passeng
 plt.show()
         
 #从测试数据中提取特征
-<<<<<<< HEAD
+
 fastest_routes_test=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\fastest_routes_test.csv')
 test=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\test.csv')
-=======
-fastest_routes_test=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\fastest_routes_test.csv')
-test=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\test.csv')
->>>>>>> a3e2fda7271c556fda20d8afed03f44084380774
+
 test_sc=fastest_routes_test[['id','total_distance','total_travel_time','number_of_steps']]
 test_new=pd.merge(test,test_sc,on='id',how='left')
 
@@ -587,11 +584,8 @@ model=xgb.train(xgb_pars,dtrain,15,watch,early_stopping_rounds=2,maximize=False,
 print('modeling RMSLE %.5f'% model.best_score)
 
 #考虑天气对trip_duration的影响
-<<<<<<< HEAD
 weather=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\weather_data_nyc_centralpark_2016.csv')
-=======
-weather=pd.read_csv(r'C:\Users\Wizza\Documents\Python Scripts\trip duration\weather_data_nyc_centralpark_2016.csv')
->>>>>>> a3e2fda7271c556fda20d8afed03f44084380774
+
 from ggplot import *
 weather['date']=pd.to_datetime(weather.date)
 weather['day_of_year']=weather['date'].dt.dayofyear
@@ -599,7 +593,7 @@ p=ggplot(aes(x='date'),data=weather)+geom_line(aes(y='minimum temperature',colou
 p+geom_point(aes(y='minimum temperature',colour='blue'))
 #findings
 #二月份的最小温度达到了零下，发现trip_duration比其他时间多
-<<<<<<< HEAD
+
 
 train_plot=train[['pickup_datetime','trip_duration']]
 train_plot['pickup_date']=train_plot['pickup_datetime'].dt.date
@@ -636,10 +630,45 @@ trace2=go.Scatter(x=random_x,y=random_y2,mode='markers',name='snow depth')
 data=[trace0,trace1,trace2]
 
 plotly.offline.iplot(data, filename='scatter-mode')
-
-from collections import Counter
-Counter('abracadabra').most_common()
-
-=======
 p1=ggplot(aes(x='pickup_date'),data=train_plot_grouped)+geom_line(aes(y='trip_duration_log',colour='blue'))
->>>>>>> a3e2fda7271c556fda20d8afed03f44084380774
+
+def freq_turn(step_dir):
+    #功能是获得step_dir的每一个方向的个数
+    from collections import Counter
+    step_dir_new=step_dir.split('|')
+    a_list=Counter(step_dir_new).most_common()
+    path={}
+    for i in range(len(a_list)):
+        path.update({a_list[i]})
+    a=0
+    b=0
+    c=0
+    if 'straigth' in (path.keys()):
+        a=path['straigth']
+    if 'left' in (path.keys()):
+        b=path['left']
+    if 'right' in (path.keys()):
+        c=path['right']
+    return a,b,c
+
+train_fr['straigth']=0
+train_fr['left']=0
+train_fr['right']=0
+
+train_fr['straigth'],train_fr['left'],train_fr['right']=zip(*train_fr['step_direction'].map(freq_turn))
+train_fr_new=train_fr[['id','straigth','left','right']]
+train=pd.merge(train,train_fr_new,on='id',how='left')
+
+train['pickup_datetime']=pd.to_datetime(train['pickup_datetime'])
+train['date']=train['pickup_datetime'].dt.date
+train=pd.merge(train,weather[['date','minimum temperature', 'precipitation', 'snow fall', 'snow depth']],
+               on='date',how='left')
+train.loc[:,'hvsine_pick_cent_d'] = haversine_(train['pickup_latitude'].values, 
+         train['pickup_longitude'].values, train['centroid_drop_lat'].values, train['centroid_drop_long'].values)
+train.loc[:,'hvsine_drop_cent_p'] = haversine_(train['dropoff_latitude'].values,
+         train['dropoff_longitude'].values, train['centroid_pick_lat'].values, train['centroid_pick_long'].values)
+
+test.loc[:,'hvsine_pick_cent_d'] = haversine_(test['pickup_latitude'].values, test['pickup_longitude'].values, 
+        test['centroid_drop_lat'].values, test['centroid_drop_long'].values)
+test.loc[:,'hvsine_drop_cent_p'] = haversine_(test['dropoff_latitude'].values, test['dropoff_longitude'].values, 
+        test['centroid_pick_lat'].values, test['centroid_pick_long'].values)
