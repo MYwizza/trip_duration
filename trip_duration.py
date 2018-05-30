@@ -39,11 +39,11 @@ address='https://www.kaggle.com/maheshdadhich/strength-of-visualization-python-v
 
 #导入和合并数据
 s=time.time()
-train_fr_1=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\fastest_routes_train_part_1.csv')
-train_fr_2=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\fastest_routes_train_part_2.csv')
+train_fr_1=pd.read_csv(r'D:\LJK\data\fastest_routes_train_part_1.csv')
+train_fr_2=pd.read_csv(r'D:\LJK\data\fastest_routes_train_part_2.csv')
 train_fr=pd.concat([train_fr_1,train_fr_2])
 train_fr_new=train_fr[['id','total_distance','total_travel_time','number_of_steps']]
-train_df=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\train.csv')
+train_df=pd.read_csv(r'D:\LJK\data\train.csv')
 train=pd.merge(train_df,train_fr_new,on='id',how='left')
 train_df=train.copy()
 end=time.time()
@@ -485,8 +485,8 @@ plt.show()
         
 #从测试数据中提取特征
 
-fastest_routes_test=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\fastest_routes_test.csv')
-test=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\test.csv')
+fastest_routes_test=pd.read_csv(r'D:\LJK\data\fastest_routes_test.csv')
+test=pd.read_csv(r'D:\LJK\data\test.csv')
 
 test_sc=fastest_routes_test[['id','total_distance','total_travel_time','number_of_steps']]
 test_new=pd.merge(test,test_sc,on='id',how='left')
@@ -584,7 +584,7 @@ model=xgb.train(xgb_pars,dtrain,15,watch,early_stopping_rounds=2,maximize=False,
 print('modeling RMSLE %.5f'% model.best_score)
 
 #考虑天气对trip_duration的影响
-weather=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\weather_data_nyc_centralpark_2016.csv')
+weather=pd.read_csv(r'D:\LJK\data\weather_data_nyc_centralpark_2016.csv')
 
 from ggplot import *
 weather['date']=pd.to_datetime(weather.date)
@@ -672,3 +672,70 @@ test.loc[:,'hvsine_pick_cent_d'] = haversine_(test['pickup_latitude'].values, te
         test['centroid_drop_lat'].values, test['centroid_drop_long'].values)
 test.loc[:,'hvsine_drop_cent_p'] = haversine_(test['dropoff_latitude'].values, test['dropoff_longitude'].values, 
         test['centroid_pick_lat'].values, test['centroid_pick_long'].values)
+
+#分析新特性的影响
+temp=train[['hvsine_drop_cent_p','hvsine_pick_cent_d','hvsine_drop_cent_d','hvsine_pick_cent_p','hvsine_pick_drop',
+            'hvsine_cent_p_cent_d','total_distance']]
+temp.total_distance.dropna(inplace=True)
+print('total_number of nulls:'.format(temp.total_distance.isnull().sum()))
+temp['distance_pick_cp_cd_drop']=temp['hvsine_pick_cent_p']+temp['hvsine_cent_p_cent_d']+temp['hvsine_drop_cent_d']
+temp['distance_pick_cd_drop']=temp['hvsine_pick_cent_d']+temp['hvsine_drop_cent_d']
+temp['distance_pick_cp_drop']=temp['hvsine_pick_cent_p']+temp['hvsine_drop_cent_p']
+temp['total_distance']=np.floor(temp['total_distance']/1000)
+temp['distance_pick_cp_drop']=np.floor(temp['distance_pick_cp_drop'])
+temp['distance_pick_cd_drop']=np.floor(temp['distance_pick_cd_drop'])
+temp['distance_pick_cp_cd_drop']=np.floor(temp['distance_pick_cp_cd_drop'])
+temp1=temp.copy()
+temp=temp1.sample(100000)
+aggregation={'distance_pick_cp_cd_drop':'count','distance_pick_cp_drop':'count','distance_pick_cd_drop':'count'}
+temp2=pd.DataFrame(temp.groupby('total_distance').agg(aggregation))
+x_plot=np.linspace(0,temp.total_distance.max(),temp.shape[0])
+temp2.rename(columns={'total_distance':'count'},inplace=True)
+temp2.reset_index(inplace=True)
+temp2.total_distance=list(map(int,temp2.total_distance))#map后生成map对象，若显示结果，需要在生成map时使用List
+x_plot=temp.total_distance.unique()
+a=np.histogram(temp[['total_distance']].values,list(range(0,95)))
+N=temp.shape[0]
+data=[]
+trace1=go.Scatter(x=a[1],y=a[0],mode='lines',fill='tozeroy',line={'color': 'black', 'width': 2},name='Total_distance_OSRM')
+data.append(trace1)
+
+for kernel in ['distance_pick_cp_cd_drop','distance_pick_cd_drop','distance_pick_cp_drop']:
+    trace2=go.Scatter(x=a[1],y=np.histogram(temp[[kernel]].values,range(0,95))[0],mode='lines',line=dict(width=2,dash='dash'),name=kernel)
+    data.append(trace2)
+layout=go.Layout(annotations=[dict(x=6,y=0.38,showarrow=False,text='N={0} points'.format(N))],
+                              xaxis=dict(zeroline=False),hovermode='closest')
+fig=go.Figure(data=data,layout=layout)
+plotly.offline.iplot(fig)
+
+sns.set(style='white')
+temp3=train.copy()
+corr=temp3.corr()
+mask=np.zeros_like(corr,dtype=np.bool)
+mask[np.triu_indices_from(mask)]=True
+f,ax=plt.subplots(figsize=(15,13))
+cmap=sns.diverging_palette(220,10,as_cmap=True)
+sns.heatmap(corr,mask=mask,cmap=cmap,vmax=3,center=0,square=True,linewidths=5,cbar_kws=dict(shrink=5))
+
+test_fr=fastest_routes_test.copy()
+test_fr['straight']=0
+test_fr['left']=0
+test_fr['right']=0
+test_fr['straight'],test_fr['left'],test_fr['right']=zip(*test_fr['step_direction'].map(freq_turn))
+test_fr_new=test_fr[['id','straight','left','right']]
+test=pd.merge(test,test_fr_new,on='id',how='left')
+print(test.columns.shape[0])
+
+test['pickup_datetime']=pd.to_datetime(test['pickup_datetime'])
+test['date']=test['pickup_datetime'].dt.date
+test['date']=pd.to_datetime(test['date'])
+test=pd.merge(test,weather[['date','minimum temperature','precipitation','snow fall','snow depth']],
+              on='date',how='left')
+
+yvalid=model.predict(dvalid)
+ytest=model.predict(dtest)
+
+fig,ax=plt.subplots(nrows=2,sharex=True,sharey=True)
+sns.distplot(yvalid,ax=ax[0],color='blue',label='Validation')
+sns.distplot(ytest,ax=ax[1],color='green',label='Test')
+plt.show()
