@@ -39,11 +39,11 @@ address='https://www.kaggle.com/maheshdadhich/strength-of-visualization-python-v
 
 #导入和合并数据
 s=time.time()
-train_fr_1=pd.read_csv(r'D:\LJK\data\fastest_routes_train_part_1.csv')
-train_fr_2=pd.read_csv(r'D:\LJK\data\fastest_routes_train_part_2.csv')
+train_fr_1=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\fastest_routes_train_part_1.csv')
+train_fr_2=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\fastest_routes_train_part_2.csv')
 train_fr=pd.concat([train_fr_1,train_fr_2])
 train_fr_new=train_fr[['id','total_distance','total_travel_time','number_of_steps']]
-train_df=pd.read_csv(r'D:\LJK\data\train.csv')
+train_df=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\train.csv')
 train=pd.merge(train_df,train_fr_new,on='id',how='left')
 train_df=train.copy()
 end=time.time()
@@ -485,8 +485,8 @@ plt.show()
         
 #从测试数据中提取特征
 
-fastest_routes_test=pd.read_csv(r'D:\LJK\data\fastest_routes_test.csv')
-test=pd.read_csv(r'D:\LJK\data\test.csv')
+fastest_routes_test=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\fastest_routes_test.csv')
+test=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\test.csv')
 
 test_sc=fastest_routes_test[['id','total_distance','total_travel_time','number_of_steps']]
 test_new=pd.merge(test,test_sc,on='id',how='left')
@@ -584,7 +584,7 @@ model=xgb.train(xgb_pars,dtrain,15,watch,early_stopping_rounds=2,maximize=False,
 print('modeling RMSLE %.5f'% model.best_score)
 
 #考虑天气对trip_duration的影响
-weather=pd.read_csv(r'D:\LJK\data\weather_data_nyc_centralpark_2016.csv')
+weather=pd.read_csv(r'C:\Users\miya\Documents\GitHub\trip_duration\weather_data_nyc_centralpark_2016.csv')
 
 from ggplot import *
 weather['date']=pd.to_datetime(weather.date)
@@ -718,11 +718,11 @@ cmap=sns.diverging_palette(220,10,as_cmap=True)
 sns.heatmap(corr,mask=mask,cmap=cmap,vmax=3,center=0,square=True,linewidths=5,cbar_kws=dict(shrink=5))
 
 test_fr=fastest_routes_test.copy()
-test_fr['straight']=0
+test_fr['straigth']=0
 test_fr['left']=0
 test_fr['right']=0
-test_fr['straight'],test_fr['left'],test_fr['right']=zip(*test_fr['step_direction'].map(freq_turn))
-test_fr_new=test_fr[['id','straight','left','right']]
+test_fr['straigth'],test_fr['left'],test_fr['right']=zip(*test_fr['step_direction'].map(freq_turn))
+test_fr_new=test_fr[['id','straigth','left','right']]
 test=pd.merge(test,test_fr_new,on='id',how='left')
 print(test.columns.shape[0])
 
@@ -735,7 +735,32 @@ test=pd.merge(test,weather[['date','minimum temperature','precipitation','snow f
 yvalid=model.predict(dvalid)
 ytest=model.predict(dtest)
 
+do_not_use_for_training=['pickup_datetime','id','dropoff_datetime','store_and_fwd_flag','trip_duration','date']
+feature_names=[f for f in train.columns if f not in do_not_use_for_training]
+xtr1,xv1,ytr1,yv1=train_test_split(train[feature_names].values,y,test_size=0.2,random_state=1987)
+dtrain1=xgb.DMatrix(xtr1,label=ytr1)
+dvalid1=xgb.DMatrix(xv1,label=yv1)
+dtest1=xgb.DMatrix(test[feature_names].values)
+watch=[(dtrain1,'train'),(dvalid1,'valide')]
+xgb_pars={'min_child_weight':50,'eta':0.3,'colsample_bytree':0.3,'max_depth':10,'subsample':0.8,
+          'lambda':1.,'nthread':-1,'booster':'gbtree','silent':1,'eval_metric':'rmse','objective':'reg:linear'}
+model1=xgb.train(xgb_pars,dtrain1,15,watch,early_stopping_rounds=2,maximize=False,verbose_eval=1)
+print('modeling1 RMSLE %.5f'% model1.best_score)
+
 fig,ax=plt.subplots(nrows=2,sharex=True,sharey=True)
 sns.distplot(yvalid,ax=ax[0],color='blue',label='Validation')
 sns.distplot(ytest,ax=ax[1],color='green',label='Test')
 plt.show()
+
+feature_importance_dict=model1.get_fscore()
+fs=['f%i'% i for i in range(len(feature_names))]
+f1=pd.DataFrame({'f':list(feature_importance_dict.keys()),
+                 'importance':list(feature_importance_dict.values())})
+f2=pd.DataFrame({'f':fs,'feature_name':feature_names})
+
+feature_importance=pd.merge(f2,f1,on='f',how='left')
+feature_importance=feature_importance.fillna(0)
+feature_importance[['feature_name','importance']].sort_values(by='importance',ascending=False)
+
+for index,row in feature_importance.head(5).iterrows():
+    print(row)
